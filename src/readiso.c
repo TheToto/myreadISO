@@ -1,7 +1,11 @@
+#define _GNU_SOURCE
+
 #include <sys/mman.h>
 #include <string.h>
 #include <stdio.h>
 #include <err.h>
+
+#include <stdlib.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,6 +18,11 @@ void *go_to(void *ptr, long int offset)
 {
   char *char_ptr = ptr;
   return char_ptr + offset;
+}
+
+char *to_char(void *ptr)
+{
+  return ptr;
 }
 
 void print_info(struct iso_prim_voldesc *iso_desc)
@@ -39,9 +48,103 @@ void print_help(void)
   printf("quit: program exit\n");
 }
 
-void command_ls(struct iso_prim_voldesc *iso_desc)
+void command_ls(struct iso_dir *dir_cur)
 {
+  int dot_dir = 0;
+  while (dir_cur->idf_len != 0)
+  {
+    int len = 3;
+    char *name;
+    if (dot_dir == 0)
+      name = ".";
+    else if (dot_dir == 1)
+      name = "..";
+    else
+    {
+      void *name_void = dir_cur + 1;
+      name = name_void;
+      len = dir_cur->idf_len;
+      if ((dir_cur->type & 2) == 0)
+        len -= 2;
+    }
+    char flag_d = '-';
+    char flag_h = '-';
+    if ((dir_cur->type & 2) > 0)
+      flag_d = 'd';
+    if ((dir_cur->type & 1) > 0)
+      flag_h = 'h';
 
+    printf("%c%c %9u %04d/%02d/%02d %02d:%02d %.*s\n",
+      flag_d, flag_h, dir_cur->file_size.le, dir_cur->date[0] + 1900,
+      dir_cur->date[1], dir_cur->date[2], dir_cur->date[3],
+      dir_cur->date[4], len, name);
+    int offset = dir_cur->idf_len + sizeof(struct iso_dir);
+    if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+      offset += 1;
+    dir_cur = go_to(dir_cur, offset);
+    dot_dir++;
+  }
+}
+
+void command_cat(char *iso, struct iso_dir *dir_cur,
+    char *file_name)
+{
+  while (dir_cur->idf_len != 0)
+  {
+    int len = 3;
+    char *name;
+    void *name_void = dir_cur + 1;
+    name = name_void;
+    len = dir_cur->idf_len;
+    if ((dir_cur->type & 2) == 0)
+      len -= 2;
+    if (strncmp(name, file_name, len) == 0)
+    {
+      //PRINT
+      if ((dir_cur->type & 2) > 0)
+      {
+        fprintf(stderr,"Cet element est un dossier.\n");
+        return;
+      }
+      char *cat_file = go_to(iso, dir_cur->data_blk.le * ISO_BLOCK_SIZE);
+      fwrite(cat_file, 1, dir_cur->file_size.le, stdout);
+      return;
+    }
+    int offset = dir_cur->idf_len + sizeof(struct iso_dir);
+    if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+      offset += 1;
+    dir_cur = go_to(dir_cur, offset);
+  }
+  fprintf(stderr, "Cet element n'existe pas.\n");
+}
+
+int parseline(char *cmd, char *iso, struct iso_prim_voldesc *iso_desc,
+    struct iso_dir *dir_cur)
+{
+  char name[100];
+  char arg[4096];
+  int res = sscanf(cmd,"%s %s\n", name, arg);
+  if (strcmp(name, "quit") == 0)
+    return -1;
+  else if (strcmp(name, "ls") == 0)
+    command_ls(dir_cur);
+  //else if (strcmp(name, "pwd") == 0)
+    //command_pwd();
+  else if (strcmp(name, "cat") == 0)
+    command_cat(iso, dir_cur, arg);
+  /*else if (strcmp(name, "tree") == 0)
+    print_tree();
+  else if (strcmp(name, "get") == 0)
+    command_get();
+  else if (strcmp(name, "cd") == 0)
+    command_cd();
+  */else if (strcmp(name, "info") == 0)
+    print_info(iso_desc);
+  else if (strcmp(name, "help") == 0)
+    print_help();
+  else
+    fprintf(stderr,"Fait help d'abord tocard\n");
+  return 0;
 }
 
 int main(int argc, char *argv[])
@@ -61,27 +164,28 @@ int main(int argc, char *argv[])
   struct iso_prim_voldesc *iso_desc = go_to(iso, 32768);
   //print_info(iso_desc);
 
-  struct iso_dir cur_dir = iso_desc->root_dir;
-  
+  struct iso_dir dir_root = iso_desc->root_dir;
+  struct iso_dir *dir_cur = iso +
+    dir_root.data_blk.le * ISO_BLOCK_SIZE;
+  char *cur_dir_str = "root dir";
 
-  while(1)
+  while(isatty(STDIN_FILENO))
   {
     printf("> ");
-    char cmd[4096];
+    char cmd[4096] = {0};
     fgets(cmd, 4096, stdin);
-    //printf("cmd %d %s",1,cmd);
-    char name[100];
-    char arg[4096];
-    int res = sscanf(cmd,"%s %s\n", name, arg);
-    //printf("res : %d, :%s:%s:\n",res, name ,arg);
-    if (strcmp(name, "quit") == 0)
+    if (parseline(cmd, iso, iso_desc, dir_cur) == -1)
       break;
-    else if (strcmp(name, "info") == 0)
-      print_info(iso_desc);
-    else if (strcmp(name, "help") == 0)
-      print_help();
-    else
-      fprintf(stderr,"Fait help d'abord tocard\n");
+  }
+  if (!isatty(STDIN_FILENO))
+  {
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t nread;
+    while ((nread = getline(&line, &len, stdin)) != -1)
+      if (parseline(line, iso, iso_desc, dir_cur) == -1)
+        break;
+    free(line);
   }
 
   munmap(iso, buffer.st_size);
