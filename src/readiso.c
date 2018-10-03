@@ -14,6 +14,16 @@
 
 #include "../iso9660.h"
 
+struct state
+{
+  char *iso;
+  struct iso_prim_voldesc *iso_desc;
+  struct iso_dir *root_dir;
+  struct iso_dir *dir_cur;
+  int depth;
+  char pwd[8][15];
+};
+
 void *go_to(void *ptr, long int offset)
 {
   char *char_ptr = ptr;
@@ -46,6 +56,14 @@ void print_help(void)
   printf("cat: display file content\n");
   printf("pwd: print current path\n");
   printf("quit: program exit\n");
+}
+
+void command_pwd(struct state *iso_state)
+{
+  for (int i = 0; i < iso_state->depth; i++)
+  {
+    printf("%d:%s\n", i, iso_state->pwd[i]);
+  }
 }
 
 void command_ls(struct iso_dir *dir_cur)
@@ -86,19 +104,18 @@ void command_ls(struct iso_dir *dir_cur)
   }
 }
 
-void command_cat(char *iso, struct iso_dir *dir_cur,
-    char *file_name)
+void command_cat(char *iso, struct iso_dir *dir_cur, char *file_name)
 {
   while (dir_cur->idf_len != 0)
   {
-    int len = 3;
+    size_t len = 3;
     char *name;
     void *name_void = dir_cur + 1;
     name = name_void;
     len = dir_cur->idf_len;
     if ((dir_cur->type & 2) == 0)
       len -= 2;
-    if (strncmp(name, file_name, len) == 0)
+    if (strlen(file_name) == len && strncmp(name, file_name, len) == 0)
     {
       //PRINT
       if ((dir_cur->type & 2) > 0)
@@ -118,32 +135,135 @@ void command_cat(char *iso, struct iso_dir *dir_cur,
   fprintf(stderr, "Cet element n'existe pas.\n");
 }
 
-int parseline(char *cmd, char *iso, struct iso_prim_voldesc *iso_desc,
-    struct iso_dir *dir_cur)
+void command_get(char *iso, struct iso_dir *dir_cur, char *file_name)
 {
-  char name[100];
-  char arg[4096];
+  while (dir_cur->idf_len != 0)
+  {
+    size_t len = 3;
+    char *name;
+    void *name_void = dir_cur + 1;
+    name = name_void;
+    len = dir_cur->idf_len;
+    if ((dir_cur->type & 2) == 0)
+      len -= 2;
+    if (strlen(file_name) == len && strncmp(name, file_name, len) == 0)
+    {
+      //PRINT
+      if ((dir_cur->type & 2) > 0)
+      {
+        fprintf(stderr,"Cet element est un dossier.\n");
+        return;
+      }
+      char *cat_file = go_to(iso, dir_cur->data_blk.le * ISO_BLOCK_SIZE);
+      FILE *output = fopen(file_name, "w");
+      fwrite(cat_file, 1, dir_cur->file_size.le, output);
+      fclose(output);
+      return;
+    }
+    int offset = dir_cur->idf_len + sizeof(struct iso_dir);
+    if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+      offset += 1;
+    dir_cur = go_to(dir_cur, offset);
+  }
+  fprintf(stderr, "Cet element n'existe pas.\n");
+}
+
+void command_cd(struct state *iso_state, char *dir_name)
+{
+  struct iso_dir *dir_cur = iso_state->dir_cur;
+  int dot_dir = 0;
+  while (dir_cur->idf_len != 0)
+  {
+    size_t len = 3;
+    char *name;
+    if (dot_dir == 0)
+    {
+      name = ".";
+      len = 1;
+    }
+    else if (dot_dir == 1)
+    {
+      name = "..";
+      len = 2;
+    }
+    else
+    {
+      void *name_void = dir_cur + 1;
+      name = name_void;
+      len = dir_cur->idf_len;
+      if ((dir_cur->type & 2) == 0)
+        len -= 2;
+    }
+    if (strlen(dir_name) == len && strncmp(name, dir_name, len) == 0)
+    {
+      //PRINT
+      if ((dir_cur->type & 2) > 0)
+      {
+        iso_state->dir_cur = iso_state->iso + dir_cur->data_blk.le * ISO_BLOCK_SIZE;
+        if (!strcmp(".", name))
+        {
+          dir_name = iso_state->pwd[iso_state->depth - 1];
+        }
+        else if (!strcmp("..", name))
+        {
+          dir_name = iso_state->pwd[iso_state->depth - 1];
+          iso_state->depth -= 1;
+        }
+        else
+        {
+          strcpy(iso_state->pwd[iso_state->depth], dir_name);
+          printf("DEBUG : :%s:%s:\n", dir_name, iso_state->pwd[iso_state->depth]);
+          iso_state->depth += 1;
+          command_pwd(iso_state);
+        }
+        printf("Changing to '%s' directory\n", dir_name);
+        return;
+      }
+      fprintf(stderr,"Je rentre pas dans les fichiers !\n");
+      return;
+    }
+    int offset = dir_cur->idf_len + sizeof(struct iso_dir);
+    if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+      offset += 1;
+    dir_cur = go_to(dir_cur, offset);
+    dot_dir++;
+  }
+  fprintf(stderr, "Cet element n'existe pas.\n");
+}
+
+int parseline(char *cmd, struct state *iso_state)
+{
+  char name[100] = {0};
+  char arg[4096] =  {0};
   int res = sscanf(cmd,"%s %s\n", name, arg);
+  if (res == -1)
+    return 0;
   if (strcmp(name, "quit") == 0)
     return -1;
   else if (strcmp(name, "ls") == 0)
-    command_ls(dir_cur);
-  //else if (strcmp(name, "pwd") == 0)
-    //command_pwd();
+    command_ls(iso_state->dir_cur);
+  else if (strcmp(name, "pwd") == 0)
+    command_pwd(iso_state);
   else if (strcmp(name, "cat") == 0)
-    command_cat(iso, dir_cur, arg);
+    command_cat(iso_state->iso, iso_state->dir_cur, arg);
   /*else if (strcmp(name, "tree") == 0)
-    print_tree();
+    print_tree();*/
   else if (strcmp(name, "get") == 0)
-    command_get();
+    command_get(iso_state->iso, iso_state->dir_cur, arg);
+  else if (strcmp(name, "cd") == 0 && res == 1)
+  {
+    iso_state->dir_cur = iso_state->root_dir;
+    printf("Changing to '%s' directory\n", "/");
+
+  }
   else if (strcmp(name, "cd") == 0)
-    command_cd();
-  */else if (strcmp(name, "info") == 0)
-    print_info(iso_desc);
+    command_cd(iso_state, arg);
+  else if (strcmp(name, "info") == 0)
+    print_info(iso_state->iso_desc);
   else if (strcmp(name, "help") == 0)
     print_help();
   else
-    fprintf(stderr,"Fait help d'abord tocard\n");
+    fprintf(stderr,"Fait help d'abord tocard %d\n", res);
   return 0;
 }
 
@@ -165,16 +285,19 @@ int main(int argc, char *argv[])
   //print_info(iso_desc);
 
   struct iso_dir dir_root = iso_desc->root_dir;
-  struct iso_dir *dir_cur = iso +
-    dir_root.data_blk.le * ISO_BLOCK_SIZE;
-  char *cur_dir_str = "root dir";
+  struct iso_dir *dir_cur = iso + dir_root.data_blk.le * ISO_BLOCK_SIZE;
+
+  int depth = 0;
+  struct state iso_state = { iso, iso_desc, dir_cur, dir_cur, depth,{"","","","","","","",""} };
 
   while(isatty(STDIN_FILENO))
   {
     printf("> ");
     char cmd[4096] = {0};
     fgets(cmd, 4096, stdin);
-    if (parseline(cmd, iso, iso_desc, dir_cur) == -1)
+    if (strlen(cmd) == 1)
+      continue;
+    if (parseline(cmd, &iso_state) == -1)
       break;
   }
   if (!isatty(STDIN_FILENO))
@@ -183,7 +306,7 @@ int main(int argc, char *argv[])
     size_t len = 0;
     ssize_t nread;
     while ((nread = getline(&line, &len, stdin)) != -1)
-      if (parseline(line, iso, iso_desc, dir_cur) == -1)
+      if (parseline(line, &iso_state) == -1)
         break;
     free(line);
   }
