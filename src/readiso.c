@@ -60,10 +60,13 @@ void print_help(void)
 
 void command_pwd(struct state *iso_state)
 {
+  printf("/");
   for (int i = 0; i < iso_state->depth; i++)
   {
-    printf("%d:%s\n", i, iso_state->pwd[i]);
+    printf("%s", iso_state->pwd[i]);
+    printf("/");
   }
+  printf("\n");
 }
 
 void command_ls(struct iso_dir *dir_cur)
@@ -202,19 +205,23 @@ void command_cd(struct state *iso_state, char *dir_name)
         iso_state->dir_cur = iso_state->iso + dir_cur->data_blk.le * ISO_BLOCK_SIZE;
         if (!strcmp(".", name))
         {
-          dir_name = iso_state->pwd[iso_state->depth - 1];
+          if (iso_state->depth < 1)
+            dir_name = "/";
+          else
+            dir_name = iso_state->pwd[iso_state->depth - 1];
         }
         else if (!strcmp("..", name))
         {
-          dir_name = iso_state->pwd[iso_state->depth - 1];
+          if (iso_state->depth <= 1)
+            dir_name = "/";
+          else
+            dir_name = iso_state->pwd[iso_state->depth - 2];
           iso_state->depth -= 1;
         }
         else
         {
           strcpy(iso_state->pwd[iso_state->depth], dir_name);
-          printf("DEBUG : :%s:%s:\n", dir_name, iso_state->pwd[iso_state->depth]);
           iso_state->depth += 1;
-          command_pwd(iso_state);
         }
         printf("Changing to '%s' directory\n", dir_name);
         return;
