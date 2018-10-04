@@ -102,7 +102,10 @@ int parseline(char *cmd, struct state *iso_state)
   int res = sscanf(cmd,"%s %[^\n]", name, arg);
   if (res == -1)
     return 0;
-
+  if (res == 2 && arg[strlen(arg)-1] == '/')
+    arg[strlen(arg)-1] = '\0';
+  char keeparg[4096];
+  strcpy(keeparg, arg);
   char *token = arg;
   struct iso_dir *cur = iso_state->dir_cur;
   if (res == 2)
@@ -123,7 +126,7 @@ int parseline(char *cmd, struct state *iso_state)
     char *next_token;
     token = strtok(arg, s);
 
-    while(token)
+    while(token != NULL)
     {
       next_token = strtok(NULL, s);
       if (next_token == NULL)
@@ -132,7 +135,7 @@ int parseline(char *cmd, struct state *iso_state)
         cur = tmp_cd(iso_state, cur, token, is_cd);
       token = next_token;
     }
-    if (strcmp(name, "ls") == 0)
+    if (strcmp(name, "ls") == 0 || strcmp(name, "tree") == 0)
       cur = tmp_cd(iso_state,cur, token, is_cd);
   }
 
@@ -144,8 +147,10 @@ int parseline(char *cmd, struct state *iso_state)
     command_pwd(iso_state);
   else if (strcmp(name, "cat") == 0)
     command_cat(iso_state->iso, cur, token);
-  /*else if (strcmp(name, "tree") == 0)
-    print_tree();*/
+  else if (strcmp(name, "tree") == 0 && res == 1)
+    command_tree(iso_state->iso, cur, ".");
+  else if (strcmp(name, "tree") == 0)
+    command_tree(iso_state->iso, cur, keeparg);
   else if (strcmp(name, "get") == 0)
     command_get(iso_state->iso, cur, token);
   else if (strcmp(name, "cd") == 0 && res == 1)

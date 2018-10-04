@@ -20,6 +20,7 @@ void command_ls(struct iso_dir *dir_cur);
 void command_cat(char *iso, struct iso_dir *dir_cur, char *file_name);
 void command_get(char *iso, struct iso_dir *dir_cur, char *file_name);
 void command_cd(struct state *iso_state, char *dir_name);
+void command_tree(char *iso, struct iso_dir *cur, char *dir_name);
 
 void *go_to(void *ptr, long int offset);
 char *to_char(void *ptr);

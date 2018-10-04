@@ -38,6 +38,75 @@ void print_help(void)
   printf("quit: program exit\n");
 }
 
+static void tree_rec(char *iso, struct iso_dir *dir_cur, char *d,
+    int *c_fil, int *c_dir)
+{
+  //.
+  int offset = dir_cur->idf_len + sizeof(struct iso_dir);
+  if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+    offset += 1;
+  dir_cur = go_to(dir_cur, offset);
+  //..
+  offset = dir_cur->idf_len + sizeof(struct iso_dir);
+  if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+    offset += 1;
+  dir_cur = go_to(dir_cur, offset);
+
+  while (dir_cur->idf_len != 0)
+  {
+    char pre[100];
+    strcpy(pre, d);
+    int len = 3;
+    char *name;
+    void *name_void = dir_cur + 1;
+    name = name_void;
+    len = dir_cur->idf_len;
+    if ((dir_cur->type & 2) == 0)
+      len -= 2;
+
+    int offset = dir_cur->idf_len + sizeof(struct iso_dir);
+    if (dir_cur->idf_len % 2 == 0) // PADDING FIELD
+      offset += 1;
+    struct iso_dir *next_dir_cur = go_to(dir_cur, offset);
+
+    if (next_dir_cur->idf_len == 0)
+    {
+      printf("%s+-- %.*s", d, len, name);
+      strcat(pre, "    ");
+    }
+    else
+    {
+      printf("%s|-- %.*s", d, len, name);
+      strcat(pre, "|   ");
+    }
+    if ((dir_cur->type & 2) > 0)
+    {
+      *c_dir += 1;
+      printf("/\n");
+      tree_rec(iso, go_to(iso, dir_cur->data_blk.le * ISO_BLOCK_SIZE),
+          pre, c_fil, c_dir);
+    }
+    else
+    {
+      *c_fil += 1;;
+      printf("\n");
+    }
+
+    dir_cur = next_dir_cur;
+  }
+
+}
+
+void command_tree(char *iso, struct iso_dir *cur, char *dir_name)
+{
+  printf("%s\n",dir_name);
+  char pre[100];
+  int c_fil = 0;
+  int c_dir = 0;
+  tree_rec(iso, cur, pre, &c_fil, &c_dir);
+  printf("\n%d directories, %d files\n", c_dir, c_fil);
+}
+
 void command_pwd(struct state *iso_state)
 {
   printf("/");
