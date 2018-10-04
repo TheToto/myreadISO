@@ -11,6 +11,7 @@ struct state
   struct iso_dir *dir_cur;
   int depth;
   char pwd[8][15];
+  char old_pwd[120];
 };
 
 void print_info(struct iso_prim_voldesc *iso_desc);

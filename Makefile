@@ -8,5 +8,9 @@ all: $(BIN)
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(BIN)
 
+.PHONY: test
+test:
+	test/test.sh ./$(BIN)
+
 clean:
 	$(RM) $(OBJS) $(BIN)

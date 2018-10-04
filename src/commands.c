@@ -100,7 +100,7 @@ static void tree_rec(char *iso, struct iso_dir *dir_cur, char *d,
 void command_tree(char *iso, struct iso_dir *cur, char *dir_name)
 {
   printf("%s\n",dir_name);
-  char pre[100];
+  char pre[100] = {0};
   int c_fil = 0;
   int c_dir = 0;
   tree_rec(iso, cur, pre, &c_fil, &c_dir);
