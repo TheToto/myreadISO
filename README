@@ -1,0 +1,11 @@
+Ce TP etait relativement long, on se rend pas forcément compte de tout
+les cas à gérer dès le début.
+
+J'ai réalisé toutes les fonctions et j'ai essayer de coller au maximum avec
+le binaire de référence.
+
+J'ai réussi a ouvir des iso générés avec 'mkisofs' mais je n'ai pas réussi
+à ouvir un ISO ArchLinux.
+
+-- 
+Thomas "TheToto" Lupin
