@@ -1,0 +1,20 @@
+.
+|-- MP3/
+|   |-- TEST1.MP3
+|   +-- TEST2.MP3
+|-- PICS/
+|   |-- ORDURE.JPG
+|   +-- SECRET/
+|       +-- ORDURE.MP3
++-- README.TXT
+
+3 directories, 5 files
+MP3
+|-- TEST1.MP3
++-- TEST2.MP3
+
+0 directories, 2 files
+PICS/SECRET
++-- ORDURE.MP3
+
+0 directories, 1 files

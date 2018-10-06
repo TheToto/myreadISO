@@ -159,6 +159,11 @@ int parseline(char *cmd, struct state *iso_state)
     }
     if (strcmp(name, "ls") == 0 || strcmp(name, "tree") == 0)
       cur = tmp_cd(iso_state,cur, token, is_cd);
+    if (cur == NULL)
+    {
+      fprintf(stderr, "Le chemin est incorrect.\n");
+      return 0;
+    }
   }
 
   if (strcmp(name, "quit") == 0 && res == 1)

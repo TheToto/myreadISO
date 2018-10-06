@@ -9,8 +9,8 @@ $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(BIN)
 
 .PHONY: test
-test:
-	test/test.sh ./$(BIN)
+test: $(BIN)
+	tests/test.sh ./$(BIN) example.iso
 
 clean:
 	$(RM) $(OBJS) $(BIN)

@@ -1,0 +1,5 @@
+cd ./MP3
+ls
+ls ..
+cd ..
+ls PICS/SECRET/../
