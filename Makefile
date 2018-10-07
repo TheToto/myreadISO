@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -pedantic -std=c99 -g -I.
+CFLAGS=-Wall -Wextra -pedantic -std=c99 -g
 OBJS=src/readiso.o src/commands.o
 BIN=myreadiso
 
