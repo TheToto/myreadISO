@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -pedantic -std=c99 -g
 OBJS=src/readiso.o src/commands.o
-BIN=myreadiso
+BIN=my_read_iso
 
 all: $(BIN)
 
